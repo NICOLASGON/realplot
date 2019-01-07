@@ -1,0 +1,51 @@
+#!/usr/bin/python3
+#
+# Realplot is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Realplot is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Foobar. If not, see <http://www.gnu.org/licenses/>.
+
+from subprocess import Popen,PIPE  
+import time
+import sys
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--linespoints", help="Plot with lines and points", action="store_true")
+parser.add_argument("--delimiter", help="Delimiter of fields in multiplot", type=str, default=" ")
+parser.add_argument("--field", help="Number of fields in multifields input", type=int, default=0)
+args = parser.parse_args()
+
+plot = Popen(["gnuplot", "-persist"], stdin=PIPE, stdout=PIPE, stderr=PIPE)  
+plot.stdin.write(b"set xtics\n")  
+plot.stdin.write(b"set ytics\n")
+plot.stdin.write(b"set style data linespoints\n")  
+plot.stdin.write(b"set grid\n")  
+plot.stdin.write(b"set autoscale\n")  
+
+buf = []
+
+for line in sys.stdin:
+    
+    if len(line.rstrip()) == 0:
+        break;
+
+    buf.append(float(line.rstrip().split(args.delimiter)[args.field]))
+    
+    if args.linespoints:
+        plot.stdin.write(b"plot '-' with linespoints\n")
+    else:
+        plot.stdin.write(b"plot '-' with lines\n")
+
+    for index, b in enumerate(buf):
+        plot.stdin.write("\n{} {}".format(index, b).encode("utf-8"))  
+    plot.stdin.write(b"\ne\n")  
+    plot.stdin.flush()
