@@ -1,2 +1,2 @@
-=== Realplot ===
-== Realtime plotting tool in shell ==
+# Realplot
+## Realtime plotting tool in shell
