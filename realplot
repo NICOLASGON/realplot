@@ -20,16 +20,27 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--linespoints", help="Plot with lines and points", action="store_true")
+parser.add_argument("--boxes", help="Plot with boxes", action="store_true")
 parser.add_argument("--delimiter", help="Delimiter of fields in multiplot", type=str, default=" ")
 parser.add_argument("--field", help="Number of fields in multifields input", type=int, default=0)
+parser.add_argument("--streams", help="Number of stream to output", type=int, default=1)
 args = parser.parse_args()
 
-plot = Popen(["gnuplot", "-persist"], stdin=PIPE, stdout=PIPE, stderr=PIPE)  
-plot.stdin.write(b"set xtics\n")  
-plot.stdin.write(b"set ytics\n")
-plot.stdin.write(b"set style data linespoints\n")  
-plot.stdin.write(b"set grid\n")  
-plot.stdin.write(b"set autoscale\n")  
+streams = []
+for i in range(args.streams):
+    plot = Popen(["gnuplot", "-persist"], stdin=PIPE, stdout=PIPE, stderr=PIPE)  
+    plot.stdin.write(b"set xtics\n")  
+    plot.stdin.write(b"set ytics\n")
+    plot.stdin.write(b"set style data linespoints\n")  
+    plot.stdin.write(b"set grid\n")  
+    plot.stdin.write(b"set autoscale\n")
+
+    if args.boxes:
+        plot.stdin.write(b"set style fill solid\n")
+
+    new_buffer = []
+    stream = {"plot": plot, "buffer": new_buffer}
+    streams.append(stream)
 
 buf = []
 
@@ -38,14 +49,21 @@ for line in sys.stdin:
     if len(line.rstrip()) == 0:
         break;
 
-    buf.append(float(line.rstrip().split(args.delimiter)[args.field]))
-    
-    if args.linespoints:
-        plot.stdin.write(b"plot '-' with linespoints\n")
-    else:
-        plot.stdin.write(b"plot '-' with lines\n")
+    for i in range(args.streams):
+        if args.streams > 1:
+            streams[i]["buffer"].append(float(line.rstrip().split(args.delimiter)[i]))
+        else:
+            streams[i]["buffer"].append(float(line.rstrip().split(args.delimiter)[args.field]))
 
-    for index, b in enumerate(buf):
-        plot.stdin.write("\n{} {}".format(index, b).encode("utf-8"))  
-    plot.stdin.write(b"\ne\n")  
-    plot.stdin.flush()
+        if args.boxes:
+            streams[i]["plot"].stdin.write(b"plot '-' with boxes\n")
+        elif args.linespoints:
+            streams[i]["plot"].stdin.write(b"plot '-' with linespoints\n")
+        else:
+            streams[i]["plot"].stdin.write(b"plot '-' with lines\n")
+
+        for index, b in enumerate(streams[i]["buffer"]):
+            streams[i]["plot"].stdin.write("\n{} {}".format(index, b).encode("utf-8"))
+
+        streams[i]["plot"].stdin.write(b"\ne\n")  
+        streams[i]["plot"].stdin.flush()
